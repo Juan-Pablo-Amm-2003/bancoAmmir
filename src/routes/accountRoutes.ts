@@ -5,15 +5,15 @@ import {
   updateAccount,
   deleteAccountById,
   getAccountsByUserId,
-} from "../controllers/accountController";
+} from "../controllers/accountController"; // Asegúrate de que la ruta al controlador sea correcta
 
 const router = Router();
 
-router.post("/", createAccount); 
-router.get("/:id", getAccountById); 
-router.put("/:id", updateAccount); 
-router.delete("/:id", deleteAccountById); 
-router.get("/user/:userId", getAccountsByUserId);
-
+// Rutas para la gestión de cuentas
+router.post("/", createAccount); // Crear una nueva cuenta
+router.get("/:id", getAccountById); // Obtener cuenta por ID
+router.put("/:id", updateAccount); // Actualizar cuenta por ID
+router.delete("/:id", deleteAccountById); // Eliminar cuenta por ID
+router.get("/user/:userId", getAccountsByUserId); // Obtener todas las cuentas de un usuario
 
 export default router;

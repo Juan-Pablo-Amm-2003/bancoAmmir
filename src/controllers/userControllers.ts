@@ -1,41 +1,59 @@
 import { Request, Response, NextFunction } from "express";
+import User from "../models/user";
 import bcrypt from "bcrypt";
-import user from "../models/user";
+import { body, validationResult } from "express-validator";
+import jwt from "jsonwebtoken";
 
-// Registro de nuevo usuario
-export const register = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { username, pass, DNI } = req.body;
+// Middleware para validar el cuerpo de la solicitud
+const validateUser = [
+  body("username")
+    .isString()
+    .withMessage("El nombre de usuario debe ser una cadena."),
+  body("DNI").isLength({ min: 1 }).withMessage("El DNI no puede estar vacío."),
+  body("pass")
+    .isLength({ min: 6 })
+    .withMessage("La contraseña debe tener al menos 6 caracteres."),
+];
 
-  try {
-    // Verifica si el DNI ya está registrado
-    const existingUser = await user.findOne({ where: { DNI } });
-    if (existingUser) {
-      return res.status(400).json({ message: "El DNI ya está registrado" });
+// Registrar un nuevo usuario
+export const register = [
+  ...validateUser,
+  async (req: Request, res: Response, next: NextFunction) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    // Hashear contraseña
-    const hashedPass = await bcrypt.hash(pass, 10);
+    const { username, DNI, pass } = req.body;
 
-    // Crear usuario
-    const newUser = await user.create({
-      username,
-      pass: hashedPass,
-      DNI,
-    });
+    try {
+      const existingUser = await User.findOne({ where: { DNI } });
+      if (existingUser) {
+        return res.status(400).json({ message: "El DNI ya está en uso." });
+      }
 
-    return res
-      .status(201)
-      .json({ message: "Usuario registrado exitosamente", user: newUser });
-  } catch (err: any) {
-    next(err); // Manejar errores con un middleware de errores
-  }
-};
+      const hashedPassword = await bcrypt.hash(pass, 10);
+      const newUser = await User.create({
+        username,
+        DNI,
+        pass: hashedPassword,
+      });
 
-// Login de usuario
+      return res.status(201).json({
+        message: "Usuario creado correctamente",
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          DNI: newUser.DNI,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+];
+
+// Iniciar sesión
 export const login = async (
   req: Request,
   res: Response,
@@ -44,27 +62,38 @@ export const login = async (
   const { DNI, pass } = req.body;
 
   try {
-    // Buscar usuario por DNI
-    const existingUser = await user.findOne({ where: { DNI } });
-    if (!existingUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = await User.findOne({ where: { DNI } });
+    if (!user) {
+      return res.status(401).json({ message: "Credenciales inválidas." });
     }
 
-    // Comparar la contraseña ingresada con la almacenada
-    const validPass = await bcrypt.compare(pass, existingUser.pass);
-    if (!validPass) {
-      return res.status(401).json({ message: "Contraseña incorrecta" });
+    const isMatch = await bcrypt.compare(pass, user.pass);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Credenciales inválidas." });
     }
 
-    return res
-      .status(200)
-      .json({ message: "Login exitoso", user: existingUser });
-  } catch (err: any) {
-    next(err); // Manejar errores con un middleware de errores
+    // Generar un token JWT
+    const token = jwt.sign(
+      { id: user.id, username: user.username },
+      process.env.JWT_SECRET!,
+      { expiresIn: "1h" } // Expiración del token
+    );
+
+    return res.status(200).json({
+      message: "Inicio de sesión exitoso.",
+      token, // Devuelve el token al cliente
+      user: {
+        id: user.id,
+        username: user.username,
+        DNI: user.DNI,
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Obtener usuario por ID
+// Obtener un usuario por ID
 export const getUserById = async (
   req: Request,
   res: Response,
@@ -73,18 +102,60 @@ export const getUserById = async (
   const { id } = req.params;
 
   try {
-    const existingUser = await user.findByPk(id);
-    if (!existingUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
     }
-
-    return res.status(200).json({ user: existingUser });
-  } catch (err: any) {
-    next(err); // Manejar errores con un middleware de errores
+    return res.status(200).json({
+      id: user.id,
+      username: user.username,
+      DNI: user.DNI,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Eliminar usuario por ID
+// Actualizar un usuario
+export const updateUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { id } = req.params;
+  const { username, DNI, pass } = req.body;
+
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
+    }
+
+    if (pass) {
+      user.pass = await bcrypt.hash(pass, 10);
+    }
+
+    user.username = username !== undefined ? username : user.username;
+    user.DNI = DNI !== undefined ? DNI : user.DNI;
+
+    await user.save();
+
+    return res.status(200).json({
+      message: "Usuario actualizado correctamente",
+      user: {
+        id: user.id,
+        username: user.username,
+        DNI: user.DNI,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Eliminar un usuario
 export const deleteUserById = async (
   req: Request,
   res: Response,
@@ -93,52 +164,30 @@ export const deleteUserById = async (
   const { id } = req.params;
 
   try {
-    const existingUser = await user.findByPk(id);
-    if (!existingUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado." });
     }
 
-    await existingUser.destroy();
-
-    return res.status(200).json({ message: "Usuario eliminado correctamente" });
-  } catch (err: any) {
-    next(err); // Manejar errores con un middleware de errores
+    await user.destroy();
+    return res
+      .status(200)
+      .json({ message: "Usuario eliminado correctamente." });
+  } catch (err) {
+    next(err);
   }
 };
 
-// Actualizar usuario
-export const updateUser = async (
+// Obtener todos los usuarios
+export const getAllUsers = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const { id } = req.params;
-  const { username, pass, DNI } = req.body;
-
   try {
-    const existingUser = await user.findByPk(id);
-    if (!existingUser) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    // Si se proporciona una nueva contraseña, hashearla
-    let hashedPass = existingUser.pass;
-    if (pass) {
-      hashedPass = await bcrypt.hash(pass, 10);
-    }
-
-    // Actualizar campos del usuario
-    await existingUser.update({
-      username: username || existingUser.username,
-      pass: hashedPass,
-      DNI: DNI || existingUser.DNI,
-    });
-
-    return res.status(200).json({
-      message: "Usuario actualizado correctamente",
-      user: existingUser,
-    });
-  } catch (err: any) {
-    next(err); // Manejar errores con un middleware de errores
+    const users = await User.findAll();
+    return res.status(200).json(users);
+  } catch (err) {
+    next(err);
   }
 };

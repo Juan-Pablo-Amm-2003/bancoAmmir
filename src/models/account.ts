@@ -1,13 +1,13 @@
 import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sqlconfig"; 
-import User from "./user"; 
+import sequelize from "../config/sqlconfig";
+import User from "./user";
 
 class account extends Model {
-  public id!: number; 
-  public userId!: number; 
-  public balance!: number; 
-  public nCuenta!: string;
-  public readonly creationDate!: Date; 
+  public id!: number;
+  public userId!: number;
+  public balance!: number;
+  public nCuenta!: number;
+  public readonly creationDate!: Date;
 }
 
 account.init(
@@ -30,7 +30,7 @@ account.init(
       allowNull: false,
     },
     nCuenta: {
-      type: DataTypes.STRING(255),
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       unique: true,
     },
@@ -46,7 +46,6 @@ account.init(
     timestamps: false,
   }
 );
-
 
 account.belongsTo(User, { foreignKey: "userId", as: "user" });
 

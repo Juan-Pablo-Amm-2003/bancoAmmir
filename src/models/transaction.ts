@@ -1,14 +1,14 @@
 import { DataTypes, Model } from "sequelize";
 import sequelize from "../config/sqlconfig";
-import account from "./account"; 
+import account from "./account";
+
 class transaction extends Model {
   public id!: number;
-  public originAcc!: number; 
-  public targetAcc!: number; 
-  public amount!: number; 
-  public readonly transactionDate!: Date; 
+  public originAcc!: number;
+  public targetAcc!: number;
+  public amount!: number;
+  public readonly transactionDate!: Date;
 }
-
 
 transaction.init(
   {
@@ -21,16 +21,16 @@ transaction.init(
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
-        model: account, 
-        key: "id",
+        model: account,
+        key: "id", // Cambiado a id para coincidir con la tabla
       },
     },
     targetAcc: {
       type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       references: {
-        model: account, 
-        key: "id",
+        model: account,
+        key: "id", // Cambiado a id para coincidir con la tabla
       },
     },
     amount: {
@@ -44,19 +44,20 @@ transaction.init(
   },
   {
     sequelize,
-    modelName: "transaction", 
+    modelName: "transaction",
     tableName: "transaction",
-    timestamps: false, 
+    timestamps: false,
   }
 );
 
-// Definir relaciones
 transaction.belongsTo(account, {
   foreignKey: "originAcc",
+  targetKey: "id", // Cambiado a id para coincidir con la tabla
   as: "originAccount",
 });
 transaction.belongsTo(account, {
   foreignKey: "targetAcc",
+  targetKey: "id", // Cambiado a id para coincidir con la tabla
   as: "targetAccount",
 });
 

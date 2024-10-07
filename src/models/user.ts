@@ -1,5 +1,5 @@
 import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sqlconfig"; 
+import sequelize from "../config/sqlconfig";
 
 class user extends Model {
   public id!: number;
@@ -35,8 +35,8 @@ user.init(
   },
   {
     sequelize,
-    tableName: "user", 
-    timestamps: false, 
+    tableName: "user",
+    timestamps: false,
   }
 );
 
