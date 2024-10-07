@@ -3,6 +3,8 @@ import User from "../models/user";
 import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
 import jwt from "jsonwebtoken";
+import { jwtSecret } from "../config/jwtConfig"; 
+
 
 // Middleware para validar el cuerpo de la solicitud
 const validateUser = [
@@ -62,11 +64,13 @@ export const login = async (
   const { DNI, pass } = req.body;
 
   try {
+    // Busca al usuario en la base de datos usando el DNI
     const user = await User.findOne({ where: { DNI } });
     if (!user) {
       return res.status(401).json({ message: "Credenciales inválidas." });
     }
 
+    // Verifica la contraseña
     const isMatch = await bcrypt.compare(pass, user.pass);
     if (!isMatch) {
       return res.status(401).json({ message: "Credenciales inválidas." });
@@ -74,11 +78,12 @@ export const login = async (
 
     // Generar un token JWT
     const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET!,
+      { id: user.id, username: user.username }, // Carga útil del token
+      jwtSecret, // Usa la clave secreta del archivo de configuración
       { expiresIn: "1h" } // Expiración del token
     );
 
+    // Respuesta exitosa al cliente
     return res.status(200).json({
       message: "Inicio de sesión exitoso.",
       token, // Devuelve el token al cliente
@@ -89,10 +94,10 @@ export const login = async (
       },
     });
   } catch (err) {
+    // Manejo de errores
     next(err);
   }
 };
-
 // Obtener un usuario por ID
 export const getUserById = async (
   req: Request,

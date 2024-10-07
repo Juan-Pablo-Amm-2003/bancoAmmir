@@ -6,22 +6,14 @@ import {
   updateUser,
   deleteUserById,
 } from "../controllers/userControllers";
-
+import { authenticateToken } from "../middleware/authMiddleware"
 const router = Router();
 
-// Ruta para registrar un nuevo usuario
+
 router.post("/register", register);
-
-// Ruta para iniciar sesión
 router.post("/login", login);
-
-// Ruta para obtener un usuario por ID
-router.get("/user/:id", getUserById);
-
-// Ruta para eliminar un usuario por ID
-router.delete("/user/:id", deleteUserById);
-
-// Ruta para actualizar un usuario
+router.get("/user/:id", authenticateToken ,getUserById);
+router.delete("/user/:id", authenticateToken, deleteUserById);
 router.put("/user/:id", updateUser);
 
 export default router;
