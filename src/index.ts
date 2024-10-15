@@ -1,7 +1,7 @@
 import express from "express";
-import userRoutes from "./routes/userRoutes";
-import accountRoutes from "./routes/accountRoutes";
-import transactionRoutes from "./routes/transactionRoutes"; // Importa las rutas de transaction
+import userRoutes from "../src/application/routes/userRoutes";
+import accountRoutes from "../src/application/routes/accountRoutes";
+import transactionRoutes from "../src/application/routes/transactionRoutes"; 
 
 const app = express();
 const port = process.env.PORT || 3000;
