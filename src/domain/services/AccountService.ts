@@ -1,7 +1,28 @@
-// services/AccountService.ts
 import { AccountRepository } from "../repositories/AccountRepository";
 import Account from "../model/Account";
-import Transaction from "../model/Transaction"; 
+import Transaction from "../model/Transaction";
+
+// Excepciones personalizadas para la capa de dominio
+class AccountNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AccountNotFoundError";
+  }
+}
+
+class InsufficientFundsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InsufficientFundsError";
+  }
+}
+
+class TransactionAssociatedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TransactionAssociatedError";
+  }
+}
 
 export class AccountService {
   constructor(private accountRepository: AccountRepository) {}
@@ -12,15 +33,14 @@ export class AccountService {
     initialBalance: number,
     nCuenta: number
   ): Promise<Account> {
-    // Crear una nueva cuenta directamente usando el método create
     const newAccount = await Account.create({
-      userId: userId, // Asociar el ID de usuario
+      userId: userId,
       balance: initialBalance,
       nCuenta: nCuenta,
-      creationDate: new Date(), // Registrar la fecha de creación
+      creationDate: new Date(),
     });
 
-    return newAccount; // Retornar la nueva cuenta creada
+    return newAccount;
   }
 
   // Obtener una cuenta por su ID
@@ -30,13 +50,12 @@ export class AccountService {
 
   // Eliminar una cuenta por su ID (verificando transacciones asociadas)
   async deleteAccount(id: number): Promise<void> {
-    // Verificar si la cuenta tiene transacciones asociadas
     const transactionsCount = await Transaction.count({
       where: { originAcc: id },
     });
 
     if (transactionsCount > 0) {
-      throw new Error(
+      throw new TransactionAssociatedError(
         "No se puede eliminar la cuenta porque tiene transacciones asociadas."
       );
     }
@@ -44,7 +63,7 @@ export class AccountService {
     const deletedCount = await Account.destroy({ where: { id } });
 
     if (deletedCount === 0) {
-      throw new Error("Cuenta no encontrada.");
+      throw new AccountNotFoundError("Cuenta no encontrada.");
     }
   }
 
@@ -53,6 +72,7 @@ export class AccountService {
     return this.accountRepository.findByUserId(userId);
   }
 
+  // Transferencia de fondos entre cuentas
   async transferFunds(
     originAccId: number,
     targetAccId: number,
@@ -62,11 +82,15 @@ export class AccountService {
     const targetAccount = await this.accountRepository.findById(targetAccId);
 
     if (!originAccount || !targetAccount) {
-      throw new Error("Cuenta de origen o destino no encontrada.");
+      throw new AccountNotFoundError(
+        "Cuenta de origen o destino no encontrada."
+      );
     }
 
     if (originAccount.balance < amount) {
-      throw new Error("Fondos insuficientes en la cuenta de origen.");
+      throw new InsufficientFundsError(
+        "Fondos insuficientes en la cuenta de origen."
+      );
     }
 
     originAccount.balance -= amount;

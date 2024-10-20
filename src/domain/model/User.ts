@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import sequelize from "../../config/sqlconfig";
+import sequelize from "../../infrastructure/database/sqlconfig";
 
 // Definición de la interfaz de atributos para el modelo User
 export interface UserAttributes {
@@ -7,8 +7,8 @@ export interface UserAttributes {
   username: string;
   pass: string;
   DNI: string;
-  createdAt?: Date; // Opcional, ya que no se define en el init
-  updatedAt?: Date; // Opcional, ya que no se define en el init
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Interfaz para la creación de nuevos usuarios

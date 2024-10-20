@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import sequelize from "../../config/sqlconfig";
+import sequelize from "../../infrastructure/database/sqlconfig";
 import Account from "./Account";
 
 interface TransactionAttributes {
@@ -25,6 +25,7 @@ class Transaction extends Model<
   public transactionDate!: Date;
   public type!: string;
   public balance!: number;
+  status: any;
 }
 
 Transaction.init(

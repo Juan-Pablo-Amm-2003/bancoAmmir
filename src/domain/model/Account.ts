@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import sequelize from "../../config/sqlconfig";
+import sequelize from "../../infrastructure/database/sqlconfig";
 import User from "./User";
 
 // Definir los atributos de Account
@@ -63,9 +63,9 @@ Account.init(
   },
   {
     sequelize,
-    modelName: "Account", // Asegúrate de que este nombre coincida con el usado en los servicios
-    tableName: "account", // Asegúrate que coincida con el nombre de tu tabla
-    timestamps: false, // Si no deseas usar `createdAt` y `updatedAt`
+    modelName: "Account",
+    tableName: "account",
+    timestamps: false,
   }
 );
 
