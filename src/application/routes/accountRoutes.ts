@@ -9,13 +9,18 @@ const accountController = AccountController; // Utiliza el objeto exportado
 
 // Rutas para la gestión de cuentas
 router.post("/", authenticateToken, accountController.createAccount);
-router.get("/:id", authenticateToken, accountController.getAccountById); // Asegúrate de que esta función esté exportada
+router.get("/:id", authenticateToken, accountController.getAccountById);
 router.put("/:id", authenticateToken, accountController.manageAccount);
-router.delete("/:id", authenticateToken, accountController.deleteAccountById); // Asegúrate de que esta función esté exportada
+router.delete("/:id", authenticateToken, accountController.deleteAccountById);
+router.get(
+  "/accounts/number/:nCuenta",
+  accountController.getAccountByAccountNumber
+);
+
 router.get(
   "/user/:userId",
   authenticateToken,
-  accountController.getAccountsByUserId // Asegúrate de que esta función esté exportada
+  accountController.getAccountsByUserId
 );
 
 export default router;

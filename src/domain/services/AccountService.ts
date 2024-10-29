@@ -1,8 +1,9 @@
 import { AccountRepository } from "../repositories/AccountRepository";
 import Account from "../model/Account";
 import Transaction from "../model/Transaction";
+import sequelize from "../../infrastructure/database/sqlconfig";
 
-// Excepciones personalizadas para la capa de dominio
+// Excepciones personalizadas
 class AccountNotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -25,30 +26,68 @@ class TransactionAssociatedError extends Error {
 }
 
 export class AccountService {
-  constructor(private accountRepository: AccountRepository) {}
+  private accountRepository: AccountRepository;
 
-  // Crear una nueva cuenta con un saldo inicial
+  constructor(accountRepository: AccountRepository = new AccountRepository()) {
+    this.accountRepository = accountRepository;
+  }
+
+  // Método para obtener una cuenta por su número de cuenta
+  async getAccountByAccountNumber(
+    accountNumber: number
+  ): Promise<Account | null> {
+    return this.accountRepository.findByAccountNumber(accountNumber);
+  }
+
+  // Método para obtener todas las cuentas de un usuario específico
+  async getAccountsByUserId(userId: number): Promise<Account[]> {
+    return this.accountRepository.findByUserId(userId);
+  }
+
+  async createTransaction(
+    id: number,
+    parsedAmount: number,
+    type: string,
+    targetAcc: number | null = null
+  ): Promise<void> {
+    const transactionData = {
+      originAcc: id,
+      amount: parsedAmount,
+      transactionDate: new Date(),
+      type: type,
+      targetAcc: targetAcc !== null ? targetAcc : id,
+    };
+
+    await Transaction.create(transactionData);
+  }
+
   async createAccount(
     userId: number,
     initialBalance: number,
     nCuenta: number
   ): Promise<Account> {
-    const newAccount = await Account.create({
-      userId: userId,
+    if (initialBalance < 0) {
+      throw new Error("El saldo inicial no puede ser negativo.");
+    }
+
+    const account = await Account.create({
+      userId,
       balance: initialBalance,
-      nCuenta: nCuenta,
+      nCuenta,
       creationDate: new Date(),
     });
 
-    return newAccount;
+    if (!account) {
+      throw new Error("Error al crear la cuenta.");
+    }
+
+    return account;
   }
 
-  // Obtener una cuenta por su ID
   async getAccountById(id: number): Promise<Account | null> {
     return this.accountRepository.findById(id);
   }
 
-  // Eliminar una cuenta por su ID (verificando transacciones asociadas)
   async deleteAccount(id: number): Promise<void> {
     const transactionsCount = await Transaction.count({
       where: { originAcc: id },
@@ -67,17 +106,24 @@ export class AccountService {
     }
   }
 
-  // Obtener todas las cuentas de un usuario por su ID de usuario
-  async getAccountsByUserId(userId: number): Promise<Account[]> {
-    return this.accountRepository.findByUserId(userId);
+  async updateAccountBalance(id: number, newBalance: number): Promise<void> {
+    const account = await this.getAccountById(id);
+    if (!account) {
+      throw new AccountNotFoundError("Cuenta no encontrada.");
+    }
+    account.balance = newBalance;
+    await account.save();
   }
 
-  // Transferencia de fondos entre cuentas
   async transferFunds(
     originAccId: number,
     targetAccId: number,
     amount: number
   ): Promise<void> {
+    if (amount <= 0) {
+      throw new Error("El monto debe ser mayor que cero.");
+    }
+
     const originAccount = await this.accountRepository.findById(originAccId);
     const targetAccount = await this.accountRepository.findById(targetAccId);
 
@@ -93,18 +139,24 @@ export class AccountService {
       );
     }
 
-    originAccount.balance -= amount;
-    targetAccount.balance += amount;
+    await sequelize.transaction(async (t) => {
+      originAccount.balance -= amount;
+      targetAccount.balance += amount;
 
-    await Transaction.create({
-      originAcc: originAccId,
-      targetAcc: targetAccId,
-      amount: amount,
-      transactionDate: new Date(),
-      type: "transfer",
+      await originAccount.save({ transaction: t });
+      await targetAccount.save({ transaction: t });
+
+      // Crear transacción de transferencia
+      await Transaction.create(
+        {
+          originAcc: originAccId,
+          targetAcc: targetAccId,
+          amount,
+          transactionDate: new Date(),
+          type: "transfer",
+        },
+        { transaction: t }
+      );
     });
-
-    await originAccount.save();
-    await targetAccount.save();
   }
 }

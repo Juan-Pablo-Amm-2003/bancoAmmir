@@ -2,8 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { body, validationResult } from "express-validator";
 import { AccountService } from "../../domain/services/AccountService";
 import { AccountRepository } from "../../domain/repositories/AccountRepository";
-import Transaction from "../../domain/model/Transaction";
-import Account from "../../domain/model/Account";
 import ApiError from "../../utils/ApiError";
 
 const accountService = new AccountService(new AccountRepository());
@@ -29,8 +27,8 @@ export const createAccount = [
     const { userId, balance, nCuenta } = req.body;
 
     try {
-      const existingAccount = await accountService.getAccountsByUserId(
-        Number(userId)
+      const existingAccount = await accountService.getAccountByAccountNumber(
+        Number(nCuenta)
       );
       if (existingAccount) {
         return next(ApiError.badRequest("El número de cuenta ya existe."));
@@ -41,6 +39,7 @@ export const createAccount = [
         Number(balance),
         Number(nCuenta)
       );
+
       return res.status(201).json({
         message: "Cuenta creada correctamente",
         account: newAccount,
@@ -50,6 +49,27 @@ export const createAccount = [
     }
   },
 ];
+
+// Obtener cuenta por número de cuenta
+export const getAccountByAccountNumber = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const { nCuenta } = req.params;
+
+  try {
+    const account = await accountService.getAccountByAccountNumber(
+      Number(nCuenta)
+    );
+    if (!account) {
+      return next(ApiError.notFound("Cuenta no encontrada."));
+    }
+    return res.status(200).json(account);
+  } catch (err) {
+    next(err);
+  }
+};
 
 // Gestionar cuenta (depósito o retiro)
 export const manageAccount = async (
@@ -61,55 +81,88 @@ export const manageAccount = async (
   const { amount, operation } = req.body;
 
   try {
-    const account = await Account.findByPk(Number(id));
+    // Obtener la cuenta
+    const account = await accountService.getAccountById(Number(id));
+    console.log("Account fetched:", account);
+
     if (!account) {
       return next(ApiError.notFound("Cuenta no encontrada."));
     }
 
+    // Convertir balance a número, asegurando que sea correcto
+    const balance = typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance;
+    console.log("Converted balance:", balance);
+
+    // Validar el monto
     const parsedAmount = parseFloat(amount);
+    console.log("Parsed amount:", parsedAmount);
 
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return next(ApiError.badRequest("El monto debe ser un número positivo."));
+    }
+
+    let newBalance: number;
+
+    // Operación de depósito
     if (operation === "deposit") {
-      account.balance += parsedAmount;
-      await account.save();
+      console.log("Operation: deposit");
+      newBalance = balance + parsedAmount; // Asegúrate de que balance y parsedAmount sean números
+      console.log("New balance after deposit calculation:", newBalance);
 
-      // Guardar la transacción
-      await Transaction.create({
-        originAcc: account.id,
-        targetAcc: account.id,
-        amount: parsedAmount,
-        type: "deposit",
-      });
+      // Validar que newBalance es un número
+      if (isNaN(newBalance)) {
+        return next(ApiError.badRequest("El nuevo balance no es un número válido."));
+      }
+
+      await accountService.updateAccountBalance(account.id, newBalance);
+      await accountService.createTransaction(
+        account.id,
+        parsedAmount,
+        "deposit"
+      );
 
       return res.status(200).json({
         message: "Depósito realizado exitosamente.",
-        balance: account.balance.toFixed(2),
+        balance: newBalance.toFixed(2),
       });
+
+    // Operación de retiro
     } else if (operation === "withdraw") {
-      if (account.balance < parsedAmount) {
+      console.log("Operation: withdraw");
+      if (balance < parsedAmount) {
         return next(ApiError.badRequest("Fondos insuficientes."));
       }
-      account.balance -= parsedAmount;
-      await account.save();
 
-      // Guardar la transacción
-      await Transaction.create({
-        originAcc: account.id,
-        targetAcc: account.id,
-        amount: parsedAmount,
-        type: "withdraw",
-      });
+      newBalance = balance - parsedAmount;
+      console.log("New balance after withdraw calculation:", newBalance);
+
+      // Validar que newBalance es un número
+      if (isNaN(newBalance)) {
+        return next(ApiError.badRequest("El nuevo balance no es un número válido."));
+      }
+
+      await accountService.updateAccountBalance(account.id, newBalance);
+      await accountService.createTransaction(
+        account.id,
+        parsedAmount,
+        "withdraw"
+      );
 
       return res.status(200).json({
         message: "Retiro realizado exitosamente.",
-        balance: account.balance.toFixed(2),
+        balance: newBalance.toFixed(2),
       });
+
     } else {
       return next(ApiError.badRequest("Operación no válida."));
     }
   } catch (error) {
+    console.error("Error occurred:", error);
     next(error);
   }
 };
+
+
 
 // Obtener cuenta por ID
 export const getAccountById = async (
@@ -162,11 +215,11 @@ export const getAccountsByUserId = async (
   }
 };
 
-// Exportar todos los métodos
 export default {
   createAccount,
   manageAccount,
   getAccountById,
   deleteAccountById,
   getAccountsByUserId,
+  getAccountByAccountNumber,
 };
